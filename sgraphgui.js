@@ -389,11 +389,11 @@ function sgraphgui() {
         m_bFixedOrder = document.getElementById("param_cb31").checked;
         m_bCalculatedOrder = document.getElementById("param_cb33").checked;
         m_bUseGPU = document.getElementById("param_cb35").checked;
-        m_CorrLength = parseInt(document.getElementById("param_sl1").value);
-        m_OrderScale = parseFloat(document.getElementById("param_sl2").value);
-        m_MaxLost = parseFloat(document.getElementById("param_sl3").value);
-        m_nDaysToKeepOpen = parseInt(document.getElementById("param_sl4").value);
-        m_Spread = parseFloat(document.getElementById("param_sl5").value);
+        m_CorrLength = parseInt(document.getElementById("param_slider1").value);
+        m_OrderScale = parseFloat(document.getElementById("param_slider2").value);
+        m_MaxLost = parseFloat(document.getElementById("param_slider3").value);
+        m_nDaysToKeepOpen = parseInt(document.getElementById("param_slider4").value);
+        m_Spread = parseFloat(document.getElementById("param_slider5").value);
         updateSlidersLabels();
         if (m_bKnownOrder && m_bFixedOrder) {
             m_bFixedOrder = false;
@@ -1075,15 +1075,15 @@ function sgraphgui() {
         }
     }
     function updateSlidersValues() {
-        let vrange = document.getElementById("param_sl2"); // m_OrderScale
+        let vrange = document.getElementById("param_slider2"); // m_OrderScale
         let vlabel = document.getElementById("sg_param_slabel2"); // m_OrderScale
         vrange.value = m_OrderScale.toString();
         vlabel.innerText = vrange.value;
-        vrange = document.getElementById("param_sl3"); // m_MaxLost
+        vrange = document.getElementById("param_slider3"); // m_MaxLost
         vlabel = document.getElementById("sg_param_slabel3"); // m_MaxLost
         vrange.value = m_MaxLost.toString();
         vlabel.innerText = vrange.value;
-        vrange = document.getElementById("param_sl1"); // m_CorrLength
+        vrange = document.getElementById("param_slider1"); // m_CorrLength
         vlabel = document.getElementById("sg_param_slabel1"); // m_CorrLength
         vrange.value = m_CorrLength.toString();
         vlabel.innerText = vrange.value;
@@ -1110,17 +1110,17 @@ function sgraphgui() {
     }
     function getOptimizeRanges() {
         let ind = 0;
-        let vrange = document.getElementById("param_sl2"); // m_OrderScale
+        let vrange = document.getElementById("param_slider2"); // m_OrderScale
         m_sgraph.m_ranges[ind + 0] = parseFloat(vrange.min);
         m_sgraph.m_ranges[ind + 1] = parseFloat(vrange.max);
         m_sgraph.m_ranges[ind + 2] = parseFloat(vrange.step);
         ind += 3;
-        vrange = document.getElementById("param_sl3"); // m_MaxLost
+        vrange = document.getElementById("param_slider3"); // m_MaxLost
         m_sgraph.m_ranges[ind + 0] = parseFloat(vrange.min);
         m_sgraph.m_ranges[ind + 1] = parseFloat(vrange.max);
         m_sgraph.m_ranges[ind + 2] = parseFloat(vrange.step);
         ind += 3;
-        vrange = document.getElementById("param_sl1"); // m_CorrLength
+        vrange = document.getElementById("param_slider1"); // m_CorrLength
         m_sgraph.m_ranges[ind + 0] = parseFloat(vrange.min);
         m_sgraph.m_ranges[ind + 1] = parseFloat(vrange.max);
         m_sgraph.m_ranges[ind + 2] = parseFloat(vrange.step);
