@@ -25,15 +25,15 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 function sgraphgui() {
-    var MATRIX_Y = 200;
-    var MAX_ROWS_IN_RESULT_TABLE = 100;
+    const MATRIX_Y = 200;
+    const MAX_ROWS_IN_RESULT_TABLE = 100;
 
     var m_historicalDataParamsInd = 3;
     var m_nParamsWindows = 5; // number of sg_input_paramsX_div parameters windows in HTML
     var m_zIndexParamsStart = 11;
     var m_zIndexParamsMax = m_zIndexParamsStart + m_nParamsWindows - 1;
 
-    var m_params_windows = [ // must be the m_nParamsWindows+2 values 
+    const m_params_windows = [ // must be the m_nParamsWindows+2 values 
         "Show all",
         "Checkboxes",
         "Sliders",
@@ -44,20 +44,17 @@ function sgraphgui() {
  
     var m_showParamWindow = [false, false, false, false, true]; // by default show Order for 'Tomorrow' only. Must be m_nParamsWindows values 
 
-    var m_nSliders = 6;
+    var m_nSliders = 5;
     var xOffset = 0;
     var angleOffset = 0;
     var m_CorrLength = 16;
     var m_OrderScale = 0.1;
-    var m_AverageLengthMax = 100;
     var m_MaxLost = 0.4;
-    var m_AverageLength = 25;
     var m_Spread = 0.03;
     var m_bShowOpen = true;
     var m_bShowCandleStick = true;
     var m_bKnownOrder = true;
     var m_bHighlightCorrIntervals = true;
-    var m_bShowAverage = false;
     var m_bShowVolume = false;
     var m_bShowPerfomance = false;
     var m_bShowOrder = false;
@@ -68,6 +65,7 @@ function sgraphgui() {
     var m_bUseCanvas = true;
     var m_bCalculatedOrder = true;
     var m_bFixedOrder = false;
+    var m_bUseGPU = false;
     var m_nDaysToKeepOpen = 1;
     var m_movingId = 0;
     var m_zoomSliderId = 0;
@@ -158,7 +156,7 @@ function sgraphgui() {
     }
     function loadFile(filePath) {
         try {
-            var xmlhttp = new XMLHttpRequest();
+            let xmlhttp = new XMLHttpRequest();
             xmlhttp.onload = historyDataLoaded;
             xmlhttp.open("GET", filePath, true);
             xmlhttp.setRequestHeader("Content-Type", "text/html");
@@ -208,6 +206,7 @@ function sgraphgui() {
         }
     }
     function paramsWindowToTop(pid) {
+        let ind = 0;
         if (isNaN(pid)) {
             if (!pid.startsWith("sg_input"))
                 return;
@@ -382,7 +381,6 @@ function sgraphgui() {
         m_bShowCandleStick = document.getElementById("param_cb22").checked;
         m_bKnownOrder = document.getElementById("param_cb23").checked;
         m_bHighlightCorrIntervals = document.getElementById("param_cb24").checked;
-        m_bShowAverage = document.getElementById("param_cb25").checked;
         m_bShowVolume = document.getElementById("param_cb26").checked;
         m_bShowOrder = document.getElementById("param_cb27").checked;
         m_bShowProfit = document.getElementById("param_cb28").checked;
@@ -390,13 +388,12 @@ function sgraphgui() {
         m_bShowCorrPos = document.getElementById("param_cb30").checked;
         m_bFixedOrder = document.getElementById("param_cb31").checked;
         m_bCalculatedOrder = document.getElementById("param_cb33").checked;
+        m_bUseGPU = document.getElementById("param_cb35").checked;
         m_CorrLength = parseInt(document.getElementById("param_sl1").value);
         m_OrderScale = parseFloat(document.getElementById("param_sl2").value);
-        m_AverageLength = parseInt(document.getElementById("param_sl3").value);
-        m_AverageLengthMax = parseFloat(document.getElementById("param_sl3").max);
-        m_MaxLost = parseFloat(document.getElementById("param_sl4").value);
-        m_nDaysToKeepOpen = parseInt(document.getElementById("param_sl5").value);
-        m_Spread = parseFloat(document.getElementById("param_sl6").value);
+        m_MaxLost = parseFloat(document.getElementById("param_sl3").value);
+        m_nDaysToKeepOpen = parseInt(document.getElementById("param_sl4").value);
+        m_Spread = parseFloat(document.getElementById("param_sl5").value);
         updateSlidersLabels();
         if (m_bKnownOrder && m_bFixedOrder) {
             m_bFixedOrder = false;
@@ -442,7 +439,7 @@ function sgraphgui() {
         return "<td>" + cellValue + "</td>";
     }
     function createArhiveTableHead() {
-        let table = "<table id='sg_params_table'>";
+        let table = "<table id='sg_params_hist_table'>";
         table += "<thead class='theadTable'>";
         table += "<tr>";
         table += tableHeaderItem("Label");
@@ -450,10 +447,11 @@ function sgraphgui() {
         table += tableHeaderItem("Start");
         table += tableHeaderItem("End");
         m_nSliders = 0;
-        for (m_nSliders = 0; m_nSliders < 20; m_nSliders++) {
-            let vname = document.getElementById("sg_param_label" + (m_nSliders + 1));
+        for (let i = 0; i < 10; i++) {
+            let vname = document.getElementById("sg_param_label" + (i + 1));
             if (!vname)
-                break;
+                break; // must be consecutive
+            m_nSliders++;
             let vnameh = vname.textContent.split(":");
             table += tableHeaderItem(vnameh[0]);
         }
@@ -509,7 +507,6 @@ function sgraphgui() {
                 if (el.id.startsWith('param')) {
                     let vsaved = localStorage.getItem(el.id);
                     if (vsaved !== null) {
-                        let val;
                         if (el.type == "checkbox" || el.type == "radio")
                             el.checked = vsaved === "true";
                         else if (el.type != "file")
@@ -525,7 +522,7 @@ function sgraphgui() {
                 if (localStorage) {
                     let touchEvent = m_TouchScreen ? 'ontouchstart' : 'onmousedown';
                     for (let i = 1; i <= MAX_ROWS_IN_RESULT_TABLE; i++) {
-                        let rowTxt = localStorage.getItem("sg_params_table" + i);
+                        let rowTxt = localStorage.getItem("sg_params_hist_table" + i);
                         if (!rowTxt)
                             break;
                         let rowCells = rowTxt.split(",");
@@ -586,7 +583,7 @@ function sgraphgui() {
         }
     }
     function copyParamsUsedToTable(strToCopy) {
-        let table = document.getElementById("sg_params_table");
+        let table = document.getElementById("sg_params_hist_table");
         if (table && strToCopy) {
             let strCopy = strToCopy + '\n';
             let allRows = strToCopy.split(/\r?\n|\r/);
@@ -628,7 +625,7 @@ function sgraphgui() {
             }
             for (let i = 1; i < table.rows.length; i++) {
                 var cell = table.rows[i].cells[0];
-                if (cell.tabIndex != i) // Fix for error in Firefox
+                if (cell && cell.tabIndex && cell.tabIndex != i) // Fix for error in Firefox
                     cell.tabIndex = i;
             }
             for (let i = MAX_ROWS_IN_RESULT_TABLE + 1; i < table.rows.length; i++) {
@@ -678,14 +675,14 @@ function sgraphgui() {
     }
     function saveParamsTable(index) {
         if (localStorage != undefined) {
-            let table = document.getElementById("sg_params_table");
+            let table = document.getElementById("sg_params_hist_table");
             if (table && table.rows && table.rows.length > 0) {
                 let trows = table.rows;
                 let ind1 = (index < 1) ? 1 : index;
                 let ind2 = (index < 1) ? trows.length - 1 : index;
                 for (let i = ind1; i <= ind2; i++) {
                     let vrow = getTableRowStr(table, i);
-                    localStorage.setItem("sg_params_table" + i, vrow);
+                    localStorage.setItem("sg_params_hist_table" + i, vrow);
                 }
             }
         }
@@ -696,7 +693,7 @@ function sgraphgui() {
         saveParamsTable(-1);
     }
     function copyTableToString() {
-        let table = document.getElementById("sg_params_table");
+        let table = document.getElementById("sg_params_hist_table");
         let tableStr = "";
         if (table && table.rows && table.rows.length > 0) {
             let trows = table.rows;
@@ -735,7 +732,7 @@ function sgraphgui() {
         }
     }
     function clickArhiveTable() {
-        let copyAttr = document.getElementById("sg_paste_table");
+        let copyAttr = document.getElementById("sg_copypaste_area");
         if (copyAttr) {
             if (copyAttr.selectionStart != undefined) {
                 copyAttr.selectionStart = 0;
@@ -749,9 +746,9 @@ function sgraphgui() {
     }
     function copyPasteArchiveFinished() {
         clearTimeout(m_copyReadyTm);
-        let copyAttr = document.getElementById("sg_paste_table");
+        let copyAttr = document.getElementById("sg_copypaste_area");
         if (copyAttr) {
-            copyAttr.value = "Copy/Paste Table";
+            copyAttr.value = "Copy/Paste full Table";
             if (copyAttr.selectionStart != undefined) {
                 copyAttr.selectionStart = 0;
                 copyAttr.selectionEnd = 999999;
@@ -764,14 +761,14 @@ function sgraphgui() {
     }
     function copyArchiveReady() {
         clearTimeout(m_copyReadyTm);
-        let copyAttr = document.getElementById("sg_paste_table");
+        let copyAttr = document.getElementById("sg_copypaste_area");
         if (copyAttr) {
             copyAttr.value = "Done";
             m_copyReadyTm = window.setTimeout(copyPasteArchiveFinished, 1000);
         }
     }
     function copyArhiveTable() {
-        let copyAttr = document.getElementById("sg_paste_table");
+        let copyAttr = document.getElementById("sg_copypaste_area");
         if (copyAttr) {
             copyAttr.value = copyTableToString();
             copyAttr.setSelectionRange(0, 999999);
@@ -787,14 +784,14 @@ function sgraphgui() {
         }
     }
     function pasteArhiveTable() {
-        let pasteAttr = document.getElementById("sg_paste_table");
+        let pasteAttr = document.getElementById("sg_copypaste_area");
         if (pasteAttr) {
             pasteAttr.value = "";
             m_lastPasteTime = new Date();
         }
     }
     function rejectArhiveInput() {
-        let pasteAttr = document.getElementById("sg_paste_table");
+        let pasteAttr = document.getElementById("sg_copypaste_area");
         if (pasteAttr) {
             let tm = new Date();
             if (tm.getTime() - m_lastPasteTime.getTime() < 300) {
@@ -1079,34 +1076,28 @@ function sgraphgui() {
     }
     function updateSlidersValues() {
         let vrange = document.getElementById("param_sl2"); // m_OrderScale
-        let vlabel = document.getElementById("param_sla2"); // m_OrderScale
+        let vlabel = document.getElementById("sg_param_slabel2"); // m_OrderScale
         vrange.value = m_OrderScale.toString();
         vlabel.innerText = vrange.value;
-        vrange = document.getElementById("param_sl4"); // m_MaxLost
-        vlabel = document.getElementById("param_sla4"); // m_MaxLost
+        vrange = document.getElementById("param_sl3"); // m_MaxLost
+        vlabel = document.getElementById("sg_param_slabel3"); // m_MaxLost
         vrange.value = m_MaxLost.toString();
         vlabel.innerText = vrange.value;
-        vrange = document.getElementById("param_sl3"); // m_AverageLength
-        vlabel = document.getElementById("param_sla3"); // m_AverageLength
-        vrange.value = m_AverageLength.toString();
-        vlabel.innerText = vrange.value;
         vrange = document.getElementById("param_sl1"); // m_CorrLength
-        vlabel = document.getElementById("param_sla1"); // m_CorrLength
+        vlabel = document.getElementById("sg_param_slabel1"); // m_CorrLength
         vrange.value = m_CorrLength.toString();
         vlabel.innerText = vrange.value;
     }
     function updateSlidersLabels() {
-        let vlabel = document.getElementById("param_sla2"); // m_OrderScale
+        let vlabel = document.getElementById("sg_param_slabel2"); // m_OrderScale
         vlabel.innerText = m_OrderScale.toString();
-        vlabel = document.getElementById("param_sla4"); // m_MaxLost
+        vlabel = document.getElementById("sg_param_slabel3"); // m_MaxLost
         vlabel.innerText = m_MaxLost.toString();
-        vlabel = document.getElementById("param_sla3"); // m_AverageLength
-        vlabel.innerText = m_AverageLength.toString();
-        vlabel = document.getElementById("param_sla1"); // m_CorrLength
+        vlabel = document.getElementById("sg_param_slabel1"); // m_CorrLength
         vlabel.innerText = m_CorrLength.toString();
-        vlabel = document.getElementById("param_sla5"); // m_nDaysToKeepOpen
+        vlabel = document.getElementById("sg_param_slabel4"); // m_nDaysToKeepOpen
         vlabel.innerText = m_nDaysToKeepOpen.toString();
-        vlabel = document.getElementById("param_sla6"); // m_Spread
+        vlabel = document.getElementById("sg_param_slabel5"); // m_Spread
         vlabel.innerText = m_Spread.toString();
     }
     function onOptimizationEnd() {
@@ -1124,19 +1115,10 @@ function sgraphgui() {
         m_sgraph.m_ranges[ind + 1] = parseFloat(vrange.max);
         m_sgraph.m_ranges[ind + 2] = parseFloat(vrange.step);
         ind += 3;
-        vrange = document.getElementById("param_sl4"); // m_MaxLost
+        vrange = document.getElementById("param_sl3"); // m_MaxLost
         m_sgraph.m_ranges[ind + 0] = parseFloat(vrange.min);
         m_sgraph.m_ranges[ind + 1] = parseFloat(vrange.max);
         m_sgraph.m_ranges[ind + 2] = parseFloat(vrange.step);
-        ind += 3;
-        vrange = document.getElementById("param_sl3"); // m_AverageLength
-        m_sgraph.m_ranges[ind + 0] = parseFloat(vrange.min);
-        m_sgraph.m_ranges[ind + 1] = parseFloat(vrange.max);
-        m_sgraph.m_ranges[ind + 2] = parseFloat(vrange.step);
-        if (m_bKnownOrder || m_bFixedOrder) {
-            m_sgraph.m_ranges[ind + 0] = m_AverageLength;
-            m_sgraph.m_ranges[ind + 1] = m_sgraph.m_ranges[ind + 0];
-        }
         ind += 3;
         vrange = document.getElementById("param_sl1"); // m_CorrLength
         m_sgraph.m_ranges[ind + 0] = parseFloat(vrange.min);
@@ -1164,7 +1146,7 @@ function sgraphgui() {
     }
     function paramSliderChange(indDiv, indRange) {
         let tableId = getParamsWindowByInd(indDiv);
-        let labelId = document.getElementById("param_sla" + indRange);
+        let labelId = document.getElementById("sg_param_slabel" + indRange);
         let rangeId = document.getElementById("param_sl" + indRange);
         if (parseInt(tableId.style.zIndex) != m_zIndexParamsMax) {
             paramsWindowToTop(tableId.id);
@@ -1200,7 +1182,7 @@ function sgraphgui() {
         if (timeSinceastClick > 300) // wait for double click
             return;
         let index = elm.rowIndex;
-        let table = document.getElementById("sg_params_table");
+        let table = document.getElementById("sg_params_hist_table");
         let fileName = document.getElementById("sg_filename");
         if (table && fileName) {
             let rowStr = getTableRowStr(table, index);
@@ -1234,7 +1216,7 @@ function sgraphgui() {
                     m_sgraph.m_Stop = ind2;
                     for (let i = 1; i <= m_numberOfColumnsInResult - 6; i++) {
                         let vrange = document.getElementById("param_sl" + i);
-                        let vlabel = document.getElementById("param_sla" + i);
+                        let vlabel = document.getElementById("sg_param_slabel" + i);
                         vrange.value = values[i + 3];
                         vlabel.innerText = vrange.value;
                     }
@@ -1333,6 +1315,9 @@ function sgraphgui() {
         get m_ctx() { return m_ctx; }, set m_ctx(v) { m_ctx = v; },
         get m_Spread() { return m_Spread; }, set m_Spread(v) { m_Spread = v; },
         get MATRIX_Y() { return MATRIX_Y; }, set MATRIX_Y(v) { MATRIX_Y = v; },
+        get m_bUseGPU() { return m_bUseGPU; }, set m_bUseGPU(v) { m_bUseGPU = v; 
+            if (!m_bUseGPU) // sgraph can change m_bUseGPU (disable it)
+                document.getElementById("param_cb35").checked = false;},
         get m_bShowOpen() { return m_bShowOpen; }, set m_bShowOpen(v) { m_bShowOpen = v; },
         get m_bShowCorr() { return m_bShowCorr; }, set m_bShowCorr(v) { m_bShowCorr = v; },
         get m_bShowOrder() { return m_bShowOrder; }, set m_bShowOrder(v) { m_bShowOrder = v; },
@@ -1341,7 +1326,6 @@ function sgraphgui() {
         get m_bShowProfit() { return m_bShowProfit; }, set m_bShowProfit(v) { m_bShowProfit = v; },
         get m_bFixedOrder() { return m_bFixedOrder; }, set m_bFixedOrder(v) { m_bFixedOrder = v; },
         get m_bShowCorrPos() { return m_bShowCorrPos; }, set m_bShowCorrPos(v) { m_bShowCorrPos = v; },
-        get m_bShowAverage() { return m_bShowAverage; }, set m_bShowAverage(v) { m_bShowAverage = v; },
         get m_MaxLost() { return m_MaxLost; }, set m_MaxLost(v) { m_MaxLost = v; },
         get m_nDaysToKeepOpen() { return m_nDaysToKeepOpen; }, set m_nDaysToKeepOpen(v) { m_nDaysToKeepOpen = v; },
         get m_bShowPerfomance() { return m_bShowPerfomance; }, set m_bShowPerfomance(v) { m_bShowPerfomance = v; },
@@ -1349,8 +1333,6 @@ function sgraphgui() {
         get m_bShowCandleStick() { return m_bShowCandleStick; }, set m_bShowCandleStick(v) { m_bShowCandleStick = v; },
         get m_CorrLength() { return m_CorrLength; }, set m_CorrLength(v) { m_CorrLength = v; },
         get m_OrderScale() { return m_OrderScale; }, set m_OrderScale(v) { m_OrderScale = v; },
-        get m_AverageLength() { return m_AverageLength; }, set m_AverageLength(v) { m_AverageLength = v; },
-        get m_AverageLengthMax() { return m_AverageLengthMax; }, set m_AverageLengthMax(v) { m_AverageLengthMax = v; },
         get m_bHighlightCorrIntervals() { return m_bHighlightCorrIntervals; }, set m_bHighlightCorrIntervals(v) { m_bHighlightCorrIntervals = v; }
     };
 }
