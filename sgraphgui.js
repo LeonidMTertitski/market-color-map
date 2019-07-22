@@ -571,7 +571,7 @@ function sgraphgui() {
                 iStop = m_sgraph.m_nData - 1;
             resultTxt += "," + m_sgraph.m_DateTime[iStart] + "," + m_sgraph.m_DateTime[iStop];
             for (let i = 1; i <= m_numberOfColumnsInResult; i++) {
-                let vslider = document.getElementById("param_sl" + i);
+                let vslider = document.getElementById("param_slider" + i);
                 if (!vslider)
                     break;
                 resultTxt += "," + vslider.value;
@@ -1147,7 +1147,7 @@ function sgraphgui() {
     function paramSliderChange(indDiv, indRange) {
         let tableId = getParamsWindowByInd(indDiv);
         let labelId = document.getElementById("sg_param_slabel" + indRange);
-        let rangeId = document.getElementById("param_sl" + indRange);
+        let rangeId = document.getElementById("param_slider" + indRange);
         if (parseInt(tableId.style.zIndex) != m_zIndexParamsMax) {
             paramsWindowToTop(tableId.id);
         }
@@ -1215,7 +1215,7 @@ function sgraphgui() {
                     m_sgraph.m_Start = ind1;
                     m_sgraph.m_Stop = ind2;
                     for (let i = 1; i <= m_numberOfColumnsInResult - 6; i++) {
-                        let vrange = document.getElementById("param_sl" + i);
+                        let vrange = document.getElementById("param_slider" + i);
                         let vlabel = document.getElementById("sg_param_slabel" + i);
                         vrange.value = values[i + 3];
                         vlabel.innerText = vrange.value;
