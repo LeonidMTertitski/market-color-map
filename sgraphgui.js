@@ -25,15 +25,15 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 function sgraphgui() {
-    const MATRIX_Y = 200;
-    const MAX_ROWS_IN_RESULT_TABLE = 100;
+    var MATRIX_Y = 200;
+    var MAX_ROWS_IN_RESULT_TABLE = 100;
 
     var m_historicalDataParamsInd = 3;
     var m_nParamsWindows = 5; // number of sg_input_paramsX_div parameters windows in HTML
     var m_zIndexParamsStart = 11;
     var m_zIndexParamsMax = m_zIndexParamsStart + m_nParamsWindows - 1;
 
-    const m_params_windows = [ // must be the m_nParamsWindows+2 values 
+    var m_params_windows = [ // must be the m_nParamsWindows+2 values 
         "Show all",
         "Checkboxes",
         "Sliders",
@@ -731,17 +731,20 @@ function sgraphgui() {
             showSGraph();
         }
     }
+    function selectAll(copyAttr) {
+        if (copyAttr.selectionStart != undefined) {
+            copyAttr.selectionStart = 0;
+            copyAttr.selectionEnd = 999999;
+        }
+        else {
+            copyAttr.setSelectionRange(0, 999999);
+            copyAttr.select();
+        }
+    }
     function clickArhiveTable() {
         let copyAttr = document.getElementById("sg_copypaste_area");
         if (copyAttr) {
-            if (copyAttr.selectionStart != undefined) {
-                copyAttr.selectionStart = 0;
-                copyAttr.selectionEnd = 999999;
-            }
-            else {
-                copyAttr.setSelectionRange(0, 999999);
-                copyAttr.select();
-            }
+            selectAll(copyAttr);
         }
     }
     function copyPasteArchiveFinished() {
@@ -749,14 +752,7 @@ function sgraphgui() {
         let copyAttr = document.getElementById("sg_copypaste_area");
         if (copyAttr) {
             copyAttr.value = "Copy/Paste full Table";
-            if (copyAttr.selectionStart != undefined) {
-                copyAttr.selectionStart = 0;
-                copyAttr.selectionEnd = 999999;
-            }
-            else {
-                copyAttr.setSelectionRange(0, 999999);
-                copyAttr.select();
-            }
+            selectAll(copyAttr);
         }
     }
     function copyArchiveReady() {
@@ -771,36 +767,24 @@ function sgraphgui() {
         let copyAttr = document.getElementById("sg_copypaste_area");
         if (copyAttr) {
             copyAttr.value = copyTableToString();
-            copyAttr.setSelectionRange(0, 999999);
-            if (copyAttr.selectionStart != undefined) {
-                copyAttr.selectionStart = 0;
-                copyAttr.selectionEnd = 999999;
-            }
-            else {
-                copyAttr.setSelectionRange(0, 999999);
-                copyAttr.select();
-            }
-            m_copyReadyTm = window.setTimeout(copyArchiveReady, 50);
+            selectAll(copyAttr);
+            m_copyReadyTm = window.setTimeout(copyArchiveReady, 300);
+        }
+    }
+    function pasteArchiveValue() {
+        clearTimeout(m_copyReadyTm);
+        let pasteAttr = document.getElementById("sg_copypaste_area");
+        if (pasteAttr) {
+            copyParamsUsedToTable(pasteAttr.value);
+            pasteAttr.value = "Done";
+            m_copyReadyTm = window.setTimeout(copyPasteArchiveFinished, 1000);
         }
     }
     function pasteArhiveTable() {
         let pasteAttr = document.getElementById("sg_copypaste_area");
         if (pasteAttr) {
-            pasteAttr.value = "";
-            m_lastPasteTime = new Date();
-        }
-    }
-    function rejectArhiveInput() {
-        let pasteAttr = document.getElementById("sg_copypaste_area");
-        if (pasteAttr) {
-            let tm = new Date();
-            if (tm.getTime() - m_lastPasteTime.getTime() < 300) {
-                copyParamsUsedToTable(pasteAttr.value);
-                pasteAttr.value = "Done";
-                m_copyReadyTm = window.setTimeout(copyPasteArchiveFinished, 1000);
-            }
-            else
-                m_copyReadyTm = window.setTimeout(copyPasteArchiveFinished, 10);
+            selectAll(pasteAttr);
+            m_copyReadyTm = window.setTimeout(pasteArchiveValue, 300);
         }
     }
     function copyResultToTable() {
@@ -1302,7 +1286,6 @@ function sgraphgui() {
         showHideShowMenu: showHideShowMenu,
         hideParamsWindow: hideParamsWindow,
         copyResultToTable: copyResultToTable,
-        rejectArhiveInput: rejectArhiveInput,
         paramsWindowClick: paramsWindowClick,
         onClickedOptimize: onClickedOptimize,
         getOptimizeRanges: getOptimizeRanges,

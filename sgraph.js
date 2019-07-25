@@ -26,43 +26,43 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 function sgraph()
 {
-    /* following "const" must be on top of all other attributes definitions*/
+    /* following "var" must be on top of all other attributes definitions*/
     let ind = 0;
-    const INDEX_OPEN = ind; ind++;
-    const INDEX_HIGH = ind; ind++;
-    const INDEX_LOW = ind; ind++;
-    const INDEX_CLOSE = ind; ind++;
-    const INDEX_ADJ_CLOSE = ind; ind++;
-    const INDEX_VOLUME = ind; ind++;
-    const INDEX_PROFIT = ind; ind++;
-    const INDEX_MAX_CORR = ind; ind++;
-    const INDEX_MAX_CORR_DT = ind; ind++;
-    const NDATA = ind;
+    var INDEX_OPEN = ind; ind++;
+    var INDEX_HIGH = ind; ind++;
+    var INDEX_LOW = ind; ind++;
+    var INDEX_CLOSE = ind; ind++;
+    var INDEX_ADJ_CLOSE = ind; ind++;
+    var INDEX_VOLUME = ind; ind++;
+    var INDEX_PROFIT = ind; ind++;
+    var INDEX_MAX_CORR = ind; ind++;
+    var INDEX_MAX_CORR_DT = ind; ind++;
+    var NDATA = ind;
 
-    const INDEX_ORDER = NDATA; // Fake index: data are not in m_data array, but in array m_order
-
-    ind = 0;
-    const INDEX_OPEN_FP = ind; ind++;
-    const INDEX_OPEN_SPREAD_FP = ind; ind++;
-    const INDEX_HIGH_SPREAD_FP = ind; ind++;
-    const INDEX_LOW_SPREAD_FP = ind; ind++;
-    const INDEX_CLOSE_FP = ind; ind++;
-    const INDEX_CLOSE_SPREAD_FP = ind; ind++;
-    const INDEX_MAX_LOST_FP = ind; ind++;
-    const NDATA_FP = ind;
+    var INDEX_ORDER = NDATA; // Fake index: data are not in m_data array, but in array m_order
 
     ind = 0;
-    const eNoOptimization = ind; ind++;
-    const eStart1stOptimizationLoop = ind; ind++;
-    const eRun1stOptimizationLoop = ind; ind++;
-    const eStop1stOptimizationLoop = ind; ind++;
-    const eStart2ndOptimizationLoop = ind; ind++;
-    const eRun2ndOptimizationLoop = ind; ind++;
-    const eStop2ndOptimizationLoop = ind; ind++;
-    const eEndOfOptimization = ind; ind++;
+    var INDEX_OPEN_FP = ind; ind++;
+    var INDEX_OPEN_SPREAD_FP = ind; ind++;
+    var INDEX_HIGH_SPREAD_FP = ind; ind++;
+    var INDEX_LOW_SPREAD_FP = ind; ind++;
+    var INDEX_CLOSE_FP = ind; ind++;
+    var INDEX_CLOSE_SPREAD_FP = ind; ind++;
+    var INDEX_MAX_LOST_FP = ind; ind++;
+    var NDATA_FP = ind;
 
-    const HIGHLIGHT = 35;
-    const MIN_LENGTH = 100;
+    ind = 0;
+    var eNoOptimization = ind; ind++;
+    var eStart1stOptimizationLoop = ind; ind++;
+    var eRun1stOptimizationLoop = ind; ind++;
+    var eStop1stOptimizationLoop = ind; ind++;
+    var eStart2ndOptimizationLoop = ind; ind++;
+    var eRun2ndOptimizationLoop = ind; ind++;
+    var eStop2ndOptimizationLoop = ind; ind++;
+    var eEndOfOptimization = ind; ind++;
+
+    var HIGHLIGHT = 35;
+    var MIN_LENGTH = 100;
 
     /* add new attributes below this line */
     var dt1 = new Date();
@@ -132,6 +132,8 @@ function sgraph()
     var m_getCorrelationMatrixGPU = null;
     var m_corrMatrixGPU = null;
     var m_spreadUsed = -999999.0;
+    var m_corrLengthUsed = -999999.0;
+    var m_bCalcOrder = true;
     zoom = function(iZoom)
     {
         if (m_nData > 0) {
@@ -303,17 +305,21 @@ function sgraph()
         setProfitGPU(N, iStep, M, iStep, m_nData, sg_main.MATRIX_Y);
     }
     getCorrelationMatrix = function (nCorr) {
-        m_minCorr = 1e+17;
-        m_maxCorr = -1e+17;
-        if (sg_main.m_bUseGPU && m_getCorrelationMatrixGPU) {
-            getCorrelationMatrixGPU(nCorr);
-        }
-        else {
-            getCorrelationMatrixCPU(nCorr);
-        }
-        if (Math.abs(m_minCorr - m_maxCorr) < 0.0001) {
-            m_minCorr = -1.0;
-            m_maxCorr = 1.0;
+        if (m_corrLengthUsed != sg_main.m_CorrLength) {
+            m_corrLengthUsed = sg_main.m_CorrLength;
+            m_minCorr = 1e+17;
+            m_maxCorr = -1e+17;
+            m_Corr.length = 0;
+            if (sg_main.m_bUseGPU && m_getCorrelationMatrixGPU) {
+                getCorrelationMatrixGPU(nCorr);
+            }
+            else {
+                getCorrelationMatrixCPU(nCorr);
+            }
+            if (Math.abs(m_minCorr - m_maxCorr) < 0.0001) {
+                m_minCorr = -1.0;
+                m_maxCorr = 1.0;
+            }
         }
     }
     getCorrelationMatrixGPU = function (nCorr) {
@@ -340,12 +346,21 @@ function sgraph()
     getCorrelationMatrixCPU = function (ncorr) {
         let indCorr = 0;
         let ny = sg_main.MATRIX_Y;
-        let ncorr2 = ncorr * 2;
+        let ncorr2 = ncorr * 2 + 1;
+        let ncorrp1 = ncorr + 1;
         let ncorrh = ncorr / 2;
+        let ncorrhp1 = ncorrh + 1;
         let ncorrh1h = (ncorr - 1) / 2;
         let dncorr = 1.0 / ncorr;
         let d2ncorr = 1.0 / ncorrh / ncorrh1h;
         let xc = new Array(ncorr);
+        let ave = new Array(m_nData);
+        let aves = 0;
+        for (let i = 0, indv = INDEX_HIGH; i < m_nData; i++, indv += NDATA) {
+            let v = m_data[indv];
+            aves += v;
+            ave[i] = aves;
+        }
         for (let x = 0; x < m_nData; x++) {
             indCorr = x;
             if (indCorr < ncorr2) {
@@ -354,18 +369,8 @@ function sgraph()
                 }
             }
             let indx = x * NDATA + INDEX_HIGH;
-            let avex1 = 0.0;
-            let avex2 = 0.0;
-            let indxt = indx;
-            for (let i = 0; i < ncorr; i++) {
-                if (i >= ncorrh) {
-                    avex1 += m_data[indxt];
-                }
-                else {
-                    avex2 += m_data[indxt];
-                }
-                indxt -= NDATA;
-            }
+            let avex2 = ave[x] - ave[x - ncorrhp1];
+            let avex1 = ave[x - ncorrhp1] - ave[x - ncorrp1];
             let avx = (avex1 + avex2) * dncorr;
             let dtx = (avex2 - avex1) * d2ncorr;
             avx += dtx * ncorrh1h;
@@ -389,24 +394,14 @@ function sgraph()
                     m_Corr[indCorr] = 0.0;
                 }
                 else {
+                    let iy = x - ncorr - y;
                     let indy = indx - (ncorr + y) * NDATA;
-                    let avey1 = 0.0;
-                    let avey2 = 0.0;
-                    let indyt = indy;
-                    for (let i = 0; i < ncorr; i++) {
-                        if (i >= ncorrh) {
-                            avey1 += m_data[indyt];
-                        }
-                        else {
-                            avey2 += m_data[indyt];
-                        }
-                        indyt -= NDATA;
-                    }
+                    let avey2 = ave[iy] - ave[iy - ncorrhp1];
+                    let avey1 = ave[iy - ncorrhp1] - ave[iy - ncorrp1];
                     let avy = (avey1 + avey2) * dncorr;
                     let dty = (avey2 - avey1) * d2ncorr;
                     let corr = 0.0;
                     avy += dty * ncorrh1h;
-                    indxt = indx;
                     indyt = indy;
                     let avyt = avy;
                     let sqy = 0.0;
@@ -467,6 +462,11 @@ function sgraph()
         let optCorr = {
             output: [nData, nY]
         };
+        if (typeof GPU == "undefined") {
+            alert("GPU not defined. Check that you included support for GPU.\nGPU usage disabled");
+            sg_main.m_bUseGPU = false;
+            return;
+        }
         if (!GPU || !GPU.isGPUSupported || !GPU.isSinglePrecisionSupported) {
             alert("GPU not supported on your PC or by this Browser!\nGPU usage disabled");
             sg_main.m_bUseGPU = false;
@@ -1023,10 +1023,6 @@ function sgraph()
         let volumeMinMax = getVolumeMinMax();
         dMinA = stockMinMax.dMin;
         dMaxA = stockMinMax.dMax;
-        let d = dMinA - dMinA;
-        if (d <= 0.0)
-            d = 1.0;
-        d = (ih - 1) / d;
         setCorrelationMatrix();
         sg_main.m_ctx.clearRect(0, 0, m_imWidth, m_imHeight);
         scaleColormapToImage(m_colorMapData, iw, ih, m_colorMap.width, m_colorMap.height, m_Start, m_Stop);
@@ -1079,7 +1075,7 @@ function sgraph()
             m_dataFP[outdData + INDEX_CLOSE_SPREAD_FP] = closeSpread;
         }
     }
-    calculateArraysForCorrelation = function()
+    getArraysForProfitCalc = function()
     {
         if (Math.abs(sg_main.m_Spread - m_spreadUsed) > 0.00001) {
             m_spreadUsed = sg_main.m_Spread;
@@ -1090,7 +1086,7 @@ function sgraph()
     }
     deleteCorrArrays = function()
     {
-        m_Corr.length = 0;
+        m_bCalcOrder = true;
     }
     allocateImage = function(nx, ny)
     {
@@ -1112,20 +1108,20 @@ function sgraph()
     }
     setCorrelationMatrix = function()
     {
-        m_colorMap = allocateImage(m_nData, sg_main.MATRIX_Y);
-        m_colorMapData = m_colorMap.data;
-        if (m_Corr.length == 0)
+        if (m_bCalcOrder || m_corrLengthUsed != sg_main.m_CorrLength)
         {
             let nCorr = sg_main.m_CorrLength * 2;
             if (nCorr < 2)
                 nCorr = 2;
 
-            calculateArraysForCorrelation();
+            m_colorMap = allocateImage(m_nData, sg_main.MATRIX_Y);
+            m_colorMapData = m_colorMap.data;
+
+            getArraysForProfitCalc();
 
             getCorrelationMatrix(nCorr);
 
             calcColormapAndOrders(nCorr);
-
         }
     }
     getOrder = function (corr, i0, nCorr, indyCorr)
@@ -1396,9 +1392,11 @@ function sgraph()
     }
     dataLoaded = function () {
         dt4 = new Date();
-        processLoadedData();
-        m_spreadUsed = -999999.0; // Recalculate internal arrays by calculateArraysForCorrelation
+        m_bCalcOrder = true;
+        m_spreadUsed = -999999.0; // Recalculate internal arrays by getArraysForProfitCalc
+        m_corrLengthUsed = -999999.0; // Recalculate correlation matrix by getCorrelationMatrix
         m_dataGPU = null; // resend loaded data to GPU (if 'Use GPU' selected)
+        processLoadedData();
     }
     setup = function(x, y)
     {
@@ -1421,7 +1419,7 @@ function sgraph()
         sg_main.m_MaxLost = m_ranges[3];
         sg_main.m_CorrLength = m_ranges[6];
         sg_main.m_CorrLength = m_ranges[7]; // go from max to min
-        deleteCorrArrays();
+        m_bCalcOrder = true;
         setCorrelationMatrix();
     }
     set1stOptimizationValues = function () {
@@ -1537,7 +1535,7 @@ function sgraph()
                     sg_main.m_CorrLength = iRanges[6]; // go from max to min
                 if (sg_main.m_CorrLength < 2)
                     sg_main.m_CorrLength = 2;
-                deleteCorrArrays();
+                m_bCalcOrder = true;
                 setCorrelationMatrix();
             }
             let dt = new Date();
