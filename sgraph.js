@@ -73,6 +73,8 @@ function sgraph()
     var dt6 = new Date();
     var dt7 = new Date();
     var dt8 = new Date();
+    var dt9 = new Date();
+    var dt10 = new Date();
     var m_loop1Time = 0;
     var m_loop1Count = 0;
 
@@ -250,7 +252,7 @@ function sgraph()
                 maxLost[i] = m_ranges[4];
             }
         }
-        if (sg_main.m_bUseGPU && m_profitMatrixGPU) {
+        if (sg_main.m_bUseGPU && m_optimize != eNoOptimization) {
             if (!m_dataFPGPU) {
                 m_dataFPGPU = m_dataFPGPUSet(m_dataFP);
             }
@@ -302,24 +304,27 @@ function sgraph()
         let iStep = (nOpt == 2) ? 1 : 2;
         let N = Math.floor((m_ranges[1] - m_ranges[0]) / (iStep * m_ranges[2]) + 1.1);
         let M = Math.floor((m_ranges[4] - m_ranges[3]) / (iStep * m_ranges[5]) + 1.1);
-        setProfitGPU(N, iStep, M, iStep, m_nData, sg_main.MATRIX_Y);
+        setGPUKernels(N, iStep, M, iStep, m_nData, sg_main.MATRIX_Y);
     }
     getCorrelationMatrix = function (nCorr) {
         if (m_corrLengthUsed != sg_main.m_CorrLength) {
+            dt9 = new Date();
             m_corrLengthUsed = sg_main.m_CorrLength;
             m_minCorr = 1e+17;
             m_maxCorr = -1e+17;
             m_Corr.length = 0;
-            if (sg_main.m_bUseGPU && m_getCorrelationMatrixGPU) {
+            if (sg_main.m_bUseGPU && m_optimize != eNoOptimization) {
                 getCorrelationMatrixGPU(nCorr);
             }
             else {
                 getCorrelationMatrixCPU(nCorr);
+                //checkCorrelationMatrixCPU(nCorr);
             }
             if (Math.abs(m_minCorr - m_maxCorr) < 0.0001) {
                 m_minCorr = -1.0;
                 m_maxCorr = 1.0;
             }
+            dt10 = new Date();
         }
     }
     getCorrelationMatrixGPU = function (nCorr) {
@@ -343,34 +348,38 @@ function sgraph()
         }
 
     }
-    getCorrelationMatrixCPU = function (ncorr) {
+
+    checkCorrelationMatrixCPU = function (ncorr) {
         let indCorr = 0;
         let ny = sg_main.MATRIX_Y;
-        let ncorr2 = ncorr * 2 + 1;
-        let ncorrp1 = ncorr + 1;
+        let ncorr2 = ncorr * 2;
+        let ncorr2p1 = ncorr2 + 1;
         let ncorrh = ncorr / 2;
-        let ncorrhp1 = ncorrh + 1;
         let ncorrh1h = (ncorr - 1) / 2;
         let dncorr = 1.0 / ncorr;
         let d2ncorr = 1.0 / ncorrh / ncorrh1h;
         let xc = new Array(ncorr);
-        let ave = new Array(m_nData);
-        let aves = 0;
-        for (let i = 0, indv = INDEX_HIGH; i < m_nData; i++, indv += NDATA) {
-            let v = m_data[indv];
-            aves += v;
-            ave[i] = aves;
-        }
+        let diffMax = -999999.0;
         for (let x = 0; x < m_nData; x++) {
             indCorr = x;
-            if (indCorr < ncorr2) {
+            if (indCorr < ncorr2p1) {
                 for (let y = 0; y < ny; y++, indCorr += m_nData) {
                     m_Corr[indCorr] = 0.0;
                 }
             }
             let indx = x * NDATA + INDEX_HIGH;
-            let avex2 = ave[x] - ave[x - ncorrhp1];
-            let avex1 = ave[x - ncorrhp1] - ave[x - ncorrp1];
+            let avex1 = 0.0;
+            let avex2 = 0.0;
+            let indxt = indx;
+            for (let i = 0; i < ncorr; i++) {
+                if (i >= ncorrh) {
+                    avex1 += m_data[indxt];
+                }
+                else {
+                    avex2 += m_data[indxt];
+                }
+                indxt -= NDATA;
+            }
             let avx = (avex1 + avex2) * dncorr;
             let dtx = (avex2 - avex1) * d2ncorr;
             avx += dtx * ncorrh1h;
@@ -390,18 +399,28 @@ function sgraph()
                 indxt -= NDATA;
             }
             for (let y = 0; y < ny; y++) {
-                if (x - y < ncorr2) {
+                if (x - y < ncorr2p1) {
                     m_Corr[indCorr] = 0.0;
                 }
                 else {
-                    let iy = x - ncorr - y;
                     let indy = indx - (ncorr + y) * NDATA;
-                    let avey2 = ave[iy] - ave[iy - ncorrhp1];
-                    let avey1 = ave[iy - ncorrhp1] - ave[iy - ncorrp1];
+                    let avey1 = 0.0;
+                    let avey2 = 0.0;
+                    let indyt = indy;
+                    for (let i = 0; i < ncorr; i++) {
+                        if (i >= ncorrh) {
+                            avey1 += m_data[indyt];
+                        }
+                        else {
+                            avey2 += m_data[indyt];
+                        }
+                        indyt -= NDATA;
+                    }
                     let avy = (avey1 + avey2) * dncorr;
                     let dty = (avey2 - avey1) * d2ncorr;
                     let corr = 0.0;
                     avy += dty * ncorrh1h;
+                    indxt = indx;
                     indyt = indy;
                     let avyt = avy;
                     let sqy = 0.0;
@@ -422,6 +441,109 @@ function sgraph()
                         indy -= NDATA;
                     }
                     corr = corr * d;
+                    let diff = Math.abs(m_Corr[indCorr] - corr);
+                    if (diffMax < diff)
+                        diffMax = diff;
+                    //m_Corr[indCorr] = corr;
+
+                    if (m_minCorr > corr)
+                        m_minCorr = corr;
+                    if (m_maxCorr < corr)
+                        m_maxCorr = corr;
+                }
+                indCorr += m_nData;
+            }
+        }
+        if (diffMax > 0.001)
+            alert("Corr matrix difference=" + diffMax);
+    }
+    getCorrelationMatrixCPU = function (ncorr) {
+        let indCorr = 0;
+        let matrixh = sg_main.MATRIX_Y;
+        let ncorr2p1 = ncorr * 2 + 1;
+        let ncorrm1 = ncorr - 1;
+        let ncorrh = ncorr / 2;
+        let ncorrhp1 = ncorrh + 1;
+        let ncorrm1h = (ncorr - 1) / 2;
+        let dncorr = 1.0 / ncorr;
+        let d2ncorr = 1.0 / ncorrh / ncorrm1h;
+        let xc = new Array(ncorr);
+        let e1 = new Array(m_nData);
+        let e2 = new Array(m_nData);
+        let e3 = new Array(m_nData);
+        let e1sum = 0.0;
+        let e2sum = 0.0;
+        let e3sum = 0.0;
+        let e4sum = 0.0;
+        for (let i = 0, indv = INDEX_HIGH; i < m_nData; i++, indv += NDATA) {
+            let v = m_data[indv];
+            e1sum += v;
+            e2sum += v * v;
+            e1[i] = e1sum;
+            e2[i] = e2sum;
+            
+            if (i < ncorr) {
+                e3sum += v * i;
+                e4sum += i * i;
+            }
+            else {
+               e3sum = e3sum + (v * (ncorr - 1) - (e1[i - 1] - e1[i - ncorr]));
+            }
+            e3[i] = e3sum;
+        }
+        for (let indCorr1 = 0; indCorr1 < m_nData; indCorr1++) {
+            indCorr = indCorr1;
+            if (indCorr < ncorr2p1) {
+                for (let j = 0; j < matrixh; j++, indCorr += m_nData) {
+                    m_Corr[indCorr] = 0.0;
+                }
+            }
+            let indx = indCorr1 * NDATA + INDEX_HIGH;
+            let avex2 = e1[indCorr1] - e1[indCorr1 - ncorrh];
+            let avex1 = e1[indCorr1 - ncorrh] - e1[indCorr1 - ncorr];
+            let avx = (avex1 + avex2) * dncorr;
+            let dtx = (avex2 - avex1) * d2ncorr;
+            let a = dtx;
+            let b = avx - dtx * ncorrm1h;
+            let sqx = e2[indCorr1] - e2[indCorr1 - ncorr] -
+                2.0 * (e3[indCorr1] * a + (e1[indCorr1] - e1[indCorr1 - ncorr]) * b) +
+                e4sum * a * a + ncorr * ncorrm1 * a * b + b * b * ncorr;
+            avx += dtx * ncorrm1h;
+            indxt = indx;
+            for (let k = 0; k < ncorr; k++) {
+                xc[k] = (m_data[indxt] - avx);
+                avx -= dtx;
+                indxt -= NDATA;
+            }
+            for (let m = 0; m < matrixh; m++) {
+                if (indCorr1 - m < ncorr2p1) {
+                    m_Corr[indCorr] = 0.0;
+                }
+                else {
+                    let indCorr0 = indCorr1 - ncorr - m;
+                    let indy = indx - (ncorr + m) * NDATA;
+                    let avey2 = e1[indCorr0] - e1[indCorr0 - ncorrh];
+                    let avey1 = e1[indCorr0 - ncorrh] - e1[indCorr0 - ncorr];
+                    let avy = (avey1 + avey2) * dncorr;
+                    let dty = (avey2 - avey1) * d2ncorr;
+                    let a = dty;
+                    let b = avy - dty * ncorrm1h;
+                    let sqy = e2[indCorr0] - e2[indCorr0 - ncorr] -
+                        2.0 * (e3[indCorr0] * a + (e1[indCorr0] - e1[indCorr0 - ncorr]) * b) +
+                        e4sum * a * a + ncorr*ncorrm1*a*b + b*b*ncorr;
+                    let d = sqx * sqy;
+                    if (d > 0.000001)
+                        d = 1.0 / Math.sqrt(d);
+                    else
+                        d = 0.0;
+                    avy += dty * ncorrm1h;
+                    let corr = 0.0;
+                    for (let k = 0; k < ncorr; k++) {
+                        corr += xc[k] * (m_data[indy] - avy);
+                        avy -= dty;
+                        indy -= NDATA;
+                    }
+                    corr = corr * d;
                     m_Corr[indCorr] = corr;
 
                     if (m_minCorr > corr)
@@ -433,7 +555,7 @@ function sgraph()
             }
         }
     }
-    setProfitGPU = function (N, iStepOrder, M, iStepLost, nData, nY) {
+    setGPUKernels = function (N, iStepOrder, M, iStepLost, nData, nY) {
         m_dataGPUSet = null;
         m_dataFPGPUSet = null;
         m_profitMatrixGPU = null;
@@ -499,9 +621,9 @@ function sgraph()
             }
             else {
                 let ncorrh = ncorr / 2;
-                let ncorrh1h = (ncorr - 1) / 2;
+                let ncorrm1h = (ncorr - 1) / 2;
                 let dncorr = 1.0 / ncorr;
-                let d2ncorr = 1.0 / ncorrh / ncorrh1h;
+                let d2ncorr = 1.0 / ncorrh / ncorrm1h;
                 let indx = this.thread.x * NDATA + INDEX_HIGH;
                 let indy = indx - (ncorr + this.thread.y) * NDATA;
                 let avex1 = 0.0;
@@ -526,8 +648,8 @@ function sgraph()
                 let avy = (avey1 + avey2) * dncorr;
                 let dtx = (avex2 - avex1) * d2ncorr;
                 let dty = (avey2 - avey1) * d2ncorr;
-                avx += dtx * ncorrh1h;
-                avy += dty * ncorrh1h;
+                avx += dtx * ncorrm1h;
+                avy += dty * ncorrm1h;
                 indxt = indx;
                 indyt = indy;
                 let avxt = avx;
@@ -1118,7 +1240,6 @@ function sgraph()
             m_colorMapData = m_colorMap.data;
 
             getArraysForProfitCalc();
-
             getCorrelationMatrix(nCorr);
 
             calcColormapAndOrders(nCorr);
@@ -1410,17 +1531,16 @@ function sgraph()
         m_imageCanvas = sg_main.m_ctx.getImageData(0, 0, sg_main.m_cnv.width, sg_main.m_cnv.height);
         dt2 = new Date();
     }
-    set1stOptimizeRanges = function()
-    {
-        sg_main.getOptimizeRanges();
-    }
-    run1stOptimization = function () {
+    setupOptimization = function () {
         sg_main.m_OrderScale = m_ranges[0];
         sg_main.m_MaxLost = m_ranges[3];
-        sg_main.m_CorrLength = m_ranges[6];
         sg_main.m_CorrLength = m_ranges[7]; // go from max to min
         m_bCalcOrder = true;
         setCorrelationMatrix();
+    }
+    set1stOptimizeRanges = function()
+    {
+        sg_main.getOptimizeRanges();
     }
     set1stOptimizationValues = function () {
         m_optimum_OrderScale = m_ranges[0];
@@ -1443,7 +1563,10 @@ function sgraph()
             m_ranges[i * 3 + 1] = rmax;
         }
 
-        run1stOptimization();
+        if (sg_main.m_bUseGPU)
+            setupGPU(2);
+
+        setupOptimization();
     }
     set1stOptimization = function () {
         m_loop1Time = 0;
@@ -1453,7 +1576,10 @@ function sgraph()
         set1stOptimizeRanges();
         set1stOptimizationValues();
 
-        run1stOptimization();
+        if (sg_main.m_bUseGPU)
+            setupGPU(1);
+
+        setupOptimization();
     }
     setCurrentOptimizedValues = function () {
         sg_main.m_OrderScale = m_optimum_OrderScale;
@@ -1473,8 +1599,6 @@ function sgraph()
             case eStart1stOptimizationLoop:
                 set1stOptimization();
                 m_optimize++;
-                if (sg_main.m_bUseGPU)
-                    setupGPU(1);
                 break;
             case eRun1stOptimizationLoop:
                 optomizeLoop(m_optimize);
@@ -1486,8 +1610,6 @@ function sgraph()
             case eStart2ndOptimizationLoop:
                 set2ndOptimization();
                 m_optimize++;
-                if (sg_main.m_bUseGPU)
-                    setupGPU(2);
                 break;
             case eRun2ndOptimizationLoop:
                 optomizeLoop(m_optimize);
@@ -1566,7 +1688,8 @@ function sgraph()
             "Data load: " + (dt4.getTime() - dt3.getTime()).toString() + "[ms], " +
             "Background setup: " + (dt6.getTime() - dt5.getTime()).toString() + "[ms], " +
             "total 'OrderScale x MaxLost' loop=" + parseFloat(m_loop1Time/1000).toFixed(3) + "[sec], Average=" + parseFloat(m_loop1Time / (m_loop1Count+0.0001)).toFixed(3) + "[ms], " +
-            "Correlation map: " + (dt7.getTime() - dt6.getTime()).toString() + "[ms], " +
+            "Colormap: " + (dt7.getTime() - dt6.getTime()).toString() + "[ms], " +
+            "Corr Matrix: " + (dt10.getTime() - dt9.getTime()).toString() + "[ms], " +
             "Draw to screen: " + (dt8.getTime() - dt7.getTime()).toString() + "[ms]<br>" +
             "Draw total: " + (dt8.getTime() - dt5.getTime()).toString() + "[ms] ";
         
