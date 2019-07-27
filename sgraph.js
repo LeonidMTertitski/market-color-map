@@ -296,7 +296,8 @@ function sgraph()
             sg_main.m_MaxLost = m_optimum_MaxLost;
             if (m_optimum_ncorr != sg_main.m_CorrLength) {
                 m_optimum_ncorr = sg_main.m_CorrLength;
-                processLoadedData();
+                if (!sg_main.m_bUseGPU)
+                    processLoadedData();
             }
         }
     }
@@ -1326,7 +1327,7 @@ function sgraph()
             }
         }
     }
-    calcOneOrderAndColormapColumn = function (i0, nCorr, dInitialCorrPos)
+    calcOneOrderAndColormapColumn = function (i0, nCorr)
     {
         let index = i0 * NDATA;
         m_order[i0] = 0.0;
