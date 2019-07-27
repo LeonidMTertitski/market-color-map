@@ -70,7 +70,7 @@ function sgraphgui() {
     var m_movingId = 0;
     var m_zoomSliderId = 0;
     var m_faviconIndex = 0;
-    var m_paramsSliderTimer = 0;
+    var m_sliderTimer = 0;
     var m_firstTime = true;
     var m_numberOfColumnsInResult = -1;
     var m_profit = 0.0;
@@ -1129,6 +1129,10 @@ function sgraphgui() {
         }
     }
     function paramSliderChange(indDiv, indRange) {
+        if (m_sliderTimer) {
+            clearTimeout(m_sliderTimer);
+            m_sliderTimer = 0;
+        }
         let tableId = getParamsWindowByInd(indDiv);
         let labelId = document.getElementById("sg_param_slabel" + indRange);
         let rangeId = document.getElementById("param_slider" + indRange);
@@ -1136,7 +1140,8 @@ function sgraphgui() {
             paramsWindowToTop(tableId.id);
         }
         labelId.innerText = rangeId.value;
-        showNewSGraph(); // fast enough to run for each change, no "setTimeout" needed
+        m_sliderTimer = window.setTimeout(showNewSGraph, 200);
+        //showNewSGraph(); // fast enough to run for each change, no "setTimeout" needed
     }
     function getDateIndex(dateStr) {
         let ind = -1;

@@ -335,6 +335,7 @@ function sgraph()
         let gpuCorr = m_getCorrelationMatrixGPU(m_dataGPU, nCorr, NDATA, INDEX_HIGH);
         let iend = sg_main.MATRIX_Y;
         if (gpuCorr.length == iend) {
+            m_Corr = new Array(m_nData * iend);
             let k = 0;
             for (let i = 0; i < iend; i++) {
                 for (let j = 0; j < m_nData; j++, k++) {
@@ -472,6 +473,7 @@ function sgraph()
         let e1 = new Array(m_nData);
         let e2 = new Array(m_nData);
         let e3 = new Array(m_nData);
+        m_Corr = new Array(m_nData * matrixh);
         let e1sum = 0.0;
         let e2sum = 0.0;
         let e3sum = 0.0;
@@ -1593,8 +1595,10 @@ function sgraph()
             onOptimizeEnd();
     }
     optimizeParams = function() {
-        if (m_optimizeTimeout)
+        if (m_optimizeTimeout) {
             clearTimeout(m_optimizeTimeout);
+            m_optimizeTimeout = 0;
+        }
         switch (m_optimize)
         {
             case eStart1stOptimizationLoop:
@@ -1626,7 +1630,10 @@ function sgraph()
         if (m_optimize != eNoOptimization)
         {
             sg_main.updateSlidersValues();
-            m_optimizeTimeout = window.setTimeout(optimizeParams, 20);
+            let tm = 20;
+            if (false || !!document.documentMode)
+                tm = 100; // for IE delay need to be atleast 70 ms for sliders update 
+            m_optimizeTimeout = window.setTimeout(optimizeParams, tm);
         }
     }
     updateOptimums = function (iStep) {
