@@ -42,4 +42,4 @@ The X, Y color of colormap calculated on the basis of Time (X) and time differen
 The following screen shot shows the autocorrelation colormap and the graphic of profit (calculated on the basis of the maximum correlation):
 
 
-![Correlation colormap](/Market-Colormap.png?raw=true)
+![Correlation colormap](/Market-Auto-Correlation-Colormap.png?raw=true)
